@@ -35,7 +35,7 @@ Upon boot or initialization, the localized Arabic copyright header reads:
 
 * `rom/` - Original binary dumps of the Arab Ram ROM.
 * `src/` - Assembled and commented source code (Z80 assembly format compatible with modern assemblers like `sjasmplus`).
-* `docs/` - Technical notes, character set layouts, and historical documentation references.
+* `disasm_notes.md` - Technical notes, character set layouts, and historical documentation references.
 
 ---
 
