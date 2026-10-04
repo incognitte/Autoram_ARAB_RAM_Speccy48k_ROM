@@ -6,7 +6,7 @@ This repository contains the disassemblies and source code reconstruction for th
 
 ## Overview
 
-The **Arab Ram** ROM is a regional localization of the classic Sinclair ZX Spectrum operating system. Unlike the officially commissioned Egyptian Arabic ROMs (developed by Dr. Nabil Nazmi / Sinclair Egypt), the **Arab Ram** module was created by **Autoram Computer** (*Ramez M. al-Halaby & Co.*) based in Jeddah, Saudi Arabia. 
+The **Arab Ram** ROM is a regional localization of the classic Sinclair ZX Spectrum operating system. Unlike the officially commissioned Egyptian Arabic ROMs (developed by Dr. Nabil Nazmi / Sinclair Egypt), the **Arab Ram** module was created by **Autoram Computer** (*Ramez M. al-Halaby & Co.*) based in Jeddah, Saudi Arabia.
 
 Autoram was widely known in the region for producing hardware and software add-ons to adapt early home computers—such as the ZX81 and ZX Spectrum—to support the Arabic language.
 
@@ -23,9 +23,9 @@ Autoram was widely known in the region for producing hardware and software add-o
 
 Upon boot or initialization, the localized Arabic copyright header reads:
 > **عرب 🌴 رام**
-> 
+>
 > **© اوتورام كمبيوتر**
-> 
+>
 > *Meaning: Arab Ram © Autoram Computer*
 
 ---
@@ -39,7 +39,7 @@ Upon boot or initialization, the localized Arabic copyright header reads:
 
 ---
 
-## 🚀 Building the Disassembly
+## Building the Disassembly
 
 To assemble the source code and verify byte-for-byte compatibility with the original ROM:
 
