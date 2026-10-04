@@ -159,9 +159,9 @@ Printed by START-NEW (file 06): (1) ARAB_PRINT_EXTRA_MSG = CLS then the title me
 | 24 | Invalid stream | B GJUGd | لا اتصال | `لا اتصال` = `no connection` |   
 | 25 | FN without DEF | B eKd eYQaI | لا مثل معرفة | `لا مثل معرفة` = `no like defined` |   
 | 26 | Parameter error | NWC ebOGQ | خطأ مقدار |   |   
-| 27 | Tape loading error | NWC JYHFI | خطأ تعبئة |   |   
-   
-Report code printing (MAIN-5): codes 0-9 print as a digit; codes 10-27 print as the key code code+$3E (the code adds $30, and if the result is above `9` adds 14 more: 10=`H`, 11=`I` ... 27=`Y`) = ب ة ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع, then a space, the message, a space, then line:statement. L1391 forces Arabic mode first.  
+| 27 | Tape loading error | NWC JYHFI | خطأ تعبئة |   |
+
+* Report code printing (MAIN-5): codes 0-9 print as a digit; codes 10-27 print as the key code code+$3E (the code adds $30, and if the result is above `9` adds 14 more: 10=`H`, 11=`I` ... 27=`Y`) = ب ة ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع, then a space, the message, a space, then line:statement. L1391 forces Arabic mode first.  
 
 ### Cassette messages (file 04, $09A..)  
 - 0 "Start tape, then press any key." = ابدا الشريط واضغط مفتاحا (GHOG GdTQiW hGVZW eaJGM + `G`|$80)  
