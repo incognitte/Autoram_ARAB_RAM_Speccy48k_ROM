@@ -115,7 +115,7 @@ KEYBOARD:
 ;   then both sets will be free.
 
 
-        LD      HL,$5C00        ; point to KSTATE-0
+        LD      HL,KSTATE_0        ; point to KSTATE-0
 
 K_ST_LOOP:
         BIT     7,(HL)          ; is it free ?  (i.e. $FF)
@@ -142,7 +142,7 @@ K_CH_SET:
 
         RET     NC              ; return if just a single shift
 
-        LD      HL,$5C00        ; point to KSTATE-0
+        LD      HL,KSTATE_0        ; point to KSTATE-0
         CP      (HL)            ; does the main key code match ?
         JR      Z,K_REPEAT      ; forward to K-REPEAT if so
 
@@ -172,7 +172,7 @@ K_NEW:
         INC     HL              ; advance to the interrupt counter
         LD      (HL),$05        ; and initialize counter to 5
         INC     HL              ; advance to the delay
-        LD      A,($5C09)       ; pick up the system variable REPDEL
+        LD      A,(REPDEL)       ; pick up the system variable REPDEL
         LD      (HL),A          ; and insert that for first repeat delay.
         INC     HL              ; advance to last location of state map.
 
@@ -189,7 +189,7 @@ K_NEW:
         LD      (HL),A          ; put the decoded key in last location of map.
 
 K_END:
-        LD      ($5C08),A       ; update LASTK system variable.
+        LD      (LASTK),A       ; update LASTK system variable.
         SET     5,(IY+$01)      ; update FLAGS  - signal a new key.
         RET                     ; return to interrupt routine.
 
@@ -209,7 +209,7 @@ K_REPEAT:
 
         RET     NZ              ; return if not yet zero.
 
-        LD      A,($5C0A)       ; fetch the system variable value REPPER.
+        LD      A,(REPPER)       ; fetch the system variable value REPPER.
         LD      (HL),A          ; for subsequent repeats REPPER will be used.
 
         INC     HL              ; advance
@@ -349,7 +349,7 @@ L0368:
         DEC     C                       ; C = C - 1
         JP      M,K_KLC_DGT             ; if minus, jump to K_KLC_DGT
         JR      NZ,K_GRA_DGT            ; if not zero, jump to K_GRA_DGT
-        LD      HL,$254                 ; HL = $254
+        LD      HL,E_DIGITS-$30         ; HL = E_DIGITS - $30 (table is indexed by the digit's ASCII code)
         BIT     5,B                     ; test bit 5 of B
         JR      Z,K_LOOK_UP             ; if zero, jump to K_LOOK_UP
         CP      $38                     ; compare A with $38
@@ -423,8 +423,9 @@ K_KLC_DGT:
 ;   analysed in depth for this pass -- flagged as LOW CONFIDENCE / not
 ;   investigated on purpose (time budget), unlikely to be Arabic-related.
 ;==========================================================================
-        LD      HL,$37B                 ; HL = $37B
+        LD      HL,K_SYM_DIGITS-$30     ; HL = K_SYM_DIGITS - $30 (table is indexed by the digit's ASCII code)
         JR      K_LOOK_UP               ; jump to K_LOOK_UP
+K_SYM_DIGITS:
         DB          $5F, $21, $40, $23, $24, $25, $26 ; table data
 L03B2:
         DB          $27, $29, $28    ; table data

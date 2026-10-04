@@ -22,7 +22,7 @@
 ;                $41-$6B ('A'..'k'); slots for codes $5B-$60 are not
 ;                letters and hold CODE (two print hooks, $3B3C-$3B6B)
 ;   $3BC4-$3CF5  three contextual glyph tables (final / medial / initial)
-;   $3CF6-$3CFF  ARAB_PRINT_EXTRA_MSG
+;   $3CF6-$3CFF  ARAB_PRINT_EXTRA_MSG (prints the Arabic boot title logo)
 ;
 ;   HOW ARABIC IS PRINTED
 ;   Keys produce plain ASCII codes internally. PO-CHAR ($0B65, hooked at
@@ -107,26 +107,23 @@
 ;     it in memory. Confirmed on hardware. Left as shipped.
 ;   * Report 11 text decodes literally to "صحيح ك" (looks abbreviated).
 ;     Reports 1 and 18 share the same text.
-;   * One manual test (Symbol Shift+Space, cursor-left, Symbol Shift+Space
-;     x2) stored a single CHR$ 0; not explained. Callers of L1510 other than
-;     the two hooks here (e.g. L04B9 in file 04) are not traced.
 ;==========================================================================
 ARAB_NEW_CTRL_HANDLER:
         CP      4                       ; control codes 0-5 arrive here from ARAB_PO_FETCH_EXT
-        JP      C,$01FE                 ; codes 0-3: FORM OVERRIDE -> $01FE (ADD A,A; LD DE,$154C; JP $0A7B)
+        JP      C,ARAB_FORM_OVERRIDE_ENTRY ; codes 0-3: FORM OVERRIDE (ADD A,A; LD DE,ARAB_FORM_OVERRIDE_OUT; JP L0A7B)
         JP      Z,L1391                 ; code 4: Arabic ON ($1391: RES 4,(IY+1) then clear context bits 2,1)
         SET     4,(IY+1)                ; code 5: Latin ON (substitution off)
         RET                             ; return
 L387B:
-        LD      HL,$5C3C                ; (name kept, used by file 06) one-shot handler tail: HL = TV_FLAG
+        LD      HL,TV_FLAG                ; (name kept, used by file 06) one-shot handler tail: HL = TV_FLAG
         PUSH    AF                      ; save the character about to be printed
-        LD      A,($5C0E)               ; A = TVDATA low = 2*override code (0,2,4,6)
+        LD      A,(TVDATA)               ; A = TVDATA low = 2*override code (0,2,4,6)
         OR      (HL)                    ; merge into TV_FLAG: bit1 = code&1, bit2 = code>>1
         LD      (HL),A                  ; (bits 2/1 were cleared by $154C first)
         POP     AF                      ; restore the character
         JP      ARAB_PO_FETCH_EXT       ; print it with the forced form
 ARAB_MODE_TOGGLE:
-        LD      HL,$5C3C    ; refresh TV_FLAG bit 6 (keyboard map) from substitution state
+        LD      HL,TV_FLAG    ; refresh TV_FLAG bit 6 (keyboard map) from substitution state
         SET     6,(HL)                  ; assume Latin keyboard
         BIT     4,(IY+1)                ; substitution off (Latin)?
         RET     NZ                      ; yes: keep bit 6 set
@@ -140,9 +137,9 @@ ARAB_ED_KEY_EXT:
         LD      D,H                     ; D = 0
         CALL    BEEPER                  ; click exactly as the original editor did
         POP     AF                      ; key code
-        LD      HL,$F38                 ; return address = loop again
+        LD      HL,L0F38                ; return address = loop again
         PUSH    HL                      ; so every handler RETurns into the loop
-        LD      HL,($5C5B)              ; HL = K_CUR (byte right of the cursor)
+        LD      HL,(K_CUR)              ; HL = K_CUR (byte right of the cursor)
         CP      5                       ; key code 5 = Symbol Shift+ENTER on the Arabic keyboard
         JR      NZ,ED_KEY_4_CHECK       ; not 5
         CALL    ADD_CHAR                ; insert CHR$ 5, cursor advances past it
@@ -154,7 +151,7 @@ ED_KEY_4_CHECK:
 ED_SCAN_FWD:
         LD      A,(HL)            ; scan forward from the cursor
         CP      4                       ; found the closing CHR$ 4?
-        JP      Z,$1010                 ; yes: INC HL and set K_CUR (cursor moves just past it)
+        JP      Z,L1010                 ; yes: INC HL and set K_CUR (cursor moves just past it)
         CP      13                      ; end of line?
         JP      Z,ED_CUR                ; yes: cursor to the ENTER
         INC     HL                      ; next byte
@@ -210,7 +207,7 @@ KEYMAP_DONE:
 ARAB_GLYPH_GUARD:
         CALL    NUMERIC      ; (name kept) carry CLEAR = digit
         JP      C,ALPHA                 ; not a digit: carry set only if a letter
-        LD      BC,$3870                ; digit: font base for the DIGIT FONT ($39F0 = '0')
+        LD      BC,ARAB_DIGIT_FONT-8*$30 ; digit: font base for the DIGIT FONT (ARAB_DIGIT_FONT = glyph of '0')
         INC     SP                      ; drop our return address ...
         INC     SP                      ;
         RET                             ; ... and return straight out of ARAB_GLYPH_SUBSTITUTE
@@ -418,50 +415,50 @@ ARAB_DIGIT_FONT:
 ;      bit7 joins forward | bit6 no initial | bit5 no medial | bit4 clear = has final form
 ARAB_GLYPH_FLAG_TABLE:
 ARAB_GLYPH_FLAG_LOOKUP_BASE EQU ARAB_GLYPH_FLAG_TABLE - $40
-        DB          %11111111; '@' (not a letter, unused): joins fwd; forms: isolated
-        DB          %11111111; 'A' ء hamza: joins fwd; forms: isolated
-        DB          %01111111; 'B' لا lam-alef: no fwd join; forms: isolated
-        DB          %01111111; 'C' أ alef+hamza above: no fwd join; forms: isolated
-        DB          %01111111; 'D' ؤ waw+hamza: no fwd join; forms: isolated
-        DB          %01111111; 'E' إ alef+hamza below: no fwd join; forms: isolated
-        DB          %11111111; 'F' ئ ya+hamza: joins fwd; forms: isolated
-        DB          %01101111; 'G' ا alif: no fwd join; forms: isolated, final
-        DB          %10011111; 'H' ب ba: joins fwd; forms: isolated, initial, medial
-        DB          %01111111; 'I' ة ta marbuta: no fwd join; forms: isolated
-        DB          %10011111; 'J' ت ta: joins fwd; forms: isolated, initial, medial
-        DB          %10011111; 'K' ث tha: joins fwd; forms: isolated, initial, medial
-        DB          %10111111; 'L' ج jim: joins fwd; forms: isolated, initial
-        DB          %10111111; 'M' ح hah: joins fwd; forms: isolated, initial
-        DB          %10111111; 'N' خ kha: joins fwd; forms: isolated, initial
-        DB          %01111111; 'O' د dal: no fwd join; forms: isolated
-        DB          %01111111; 'P' ذ dhal: no fwd join; forms: isolated
-        DB          %01111111; 'Q' ر ra: no fwd join; forms: isolated
-        DB          %01111111; 'R' ز zay: no fwd join; forms: isolated
-        DB          %10111111; 'S' س sin: joins fwd; forms: isolated, initial
-        DB          %10111111; 'T' ش shin: joins fwd; forms: isolated, initial
-        DB          %10111111; 'U' ص sad: joins fwd; forms: isolated, initial
-        DB          %10111111; 'V' ض dad: joins fwd; forms: isolated, initial
-        DB          %11111111; 'W' ط tah: joins fwd; forms: isolated
-        DB          %11111111; 'X' ظ zah: joins fwd; forms: isolated
-        DB          %10001111; 'Y' ع ain: joins fwd; forms: isolated, initial, medial, final
-        DB          %10001111; 'Z' غ ghain: joins fwd; forms: isolated, initial, medial, final
-        DB          %01111111; '[' (not a letter, unused): no fwd join; forms: isolated
-        DB          %01111111; '\' (not a letter, unused): no fwd join; forms: isolated
-        DB          %01111111; ']' (not a letter, unused): no fwd join; forms: isolated
-        DB          %01111111; '^' (not a letter, unused): no fwd join; forms: isolated
-        DB          %01111111; '_' (not a letter, unused): no fwd join; forms: isolated
-        DB          %01111111; '`' (not a letter, unused): no fwd join; forms: isolated
-        DB          %10111111; 'a' ف fa: joins fwd; forms: isolated, initial
-        DB          %10111111; 'b' ق qaf: joins fwd; forms: isolated, initial
-        DB          %10111111; 'c' ك kaf: joins fwd; forms: isolated, initial
-        DB          %10111111; 'd' ل lam: joins fwd; forms: isolated, initial
-        DB          %10111111; 'e' م mim: joins fwd; forms: isolated, initial
-        DB          %10011111; 'f' ن nun: joins fwd; forms: isolated, initial, medial
-        DB          %10001111; 'g' ه heh: joins fwd; forms: isolated, initial, medial, final
-        DB          %01111111; 'h' و waw: no fwd join; forms: isolated
-        DB          %10001111; 'i' ي ya: joins fwd; forms: isolated, initial, medial, final
-        DB          %01101111; 'j' ى alef maqsura: no fwd join; forms: isolated, final
-        DB          %11111111; 'k' ال definite article al-: joins fwd; forms: isolated
+        DB          $FF; '@' (not a letter, unused): joins fwd; forms: isolated
+        DB          $FF; 'A' ء hamza: joins fwd; forms: isolated
+        DB          $7F; 'B' لا lam-alef: no fwd join; forms: isolated
+        DB          $7F; 'C' أ alef+hamza above: no fwd join; forms: isolated
+        DB          $7F; 'D' ؤ waw+hamza: no fwd join; forms: isolated
+        DB          $7F; 'E' إ alef+hamza below: no fwd join; forms: isolated
+        DB          $FF; 'F' ئ ya+hamza: joins fwd; forms: isolated
+        DB          $6F; 'G' ا alif: no fwd join; forms: isolated, final
+        DB          $9F; 'H' ب ba: joins fwd; forms: isolated, initial, medial
+        DB          $7F; 'I' ة ta marbuta: no fwd join; forms: isolated
+        DB          $9F; 'J' ت ta: joins fwd; forms: isolated, initial, medial
+        DB          $9F; 'K' ث tha: joins fwd; forms: isolated, initial, medial
+        DB          $BF; 'L' ج jim: joins fwd; forms: isolated, initial
+        DB          $BF; 'M' ح hah: joins fwd; forms: isolated, initial
+        DB          $BF; 'N' خ kha: joins fwd; forms: isolated, initial
+        DB          $7F; 'O' د dal: no fwd join; forms: isolated
+        DB          $7F; 'P' ذ dhal: no fwd join; forms: isolated
+        DB          $7F; 'Q' ر ra: no fwd join; forms: isolated
+        DB          $7F; 'R' ز zay: no fwd join; forms: isolated
+        DB          $BF; 'S' س sin: joins fwd; forms: isolated, initial
+        DB          $BF; 'T' ش shin: joins fwd; forms: isolated, initial
+        DB          $BF; 'U' ص sad: joins fwd; forms: isolated, initial
+        DB          $BF; 'V' ض dad: joins fwd; forms: isolated, initial
+        DB          $FF; 'W' ط tah: joins fwd; forms: isolated
+        DB          $FF; 'X' ظ zah: joins fwd; forms: isolated
+        DB          $8F; 'Y' ع ain: joins fwd; forms: isolated, initial, medial, final
+        DB          $8F; 'Z' غ ghain: joins fwd; forms: isolated, initial, medial, final
+        DB          $7F; '[' (not a letter, unused): no fwd join; forms: isolated
+        DB          $7F; '\' (not a letter, unused): no fwd join; forms: isolated
+        DB          $7F; ']' (not a letter, unused): no fwd join; forms: isolated
+        DB          $7F; '^' (not a letter, unused): no fwd join; forms: isolated
+        DB          $7F; '_' (not a letter, unused): no fwd join; forms: isolated
+        DB          $7F; '`' (not a letter, unused): no fwd join; forms: isolated
+        DB          $BF; 'a' ف fa: joins fwd; forms: isolated, initial
+        DB          $BF; 'b' ق qaf: joins fwd; forms: isolated, initial
+        DB          $BF; 'c' ك kaf: joins fwd; forms: isolated, initial
+        DB          $BF; 'd' ل lam: joins fwd; forms: isolated, initial
+        DB          $BF; 'e' م mim: joins fwd; forms: isolated, initial
+        DB          $9F; 'f' ن nun: joins fwd; forms: isolated, initial, medial
+        DB          $8F; 'g' ه heh: joins fwd; forms: isolated, initial, medial, final
+        DB          $7F; 'h' و waw: no fwd join; forms: isolated
+        DB          $8F; 'i' ي ya: joins fwd; forms: isolated, initial, medial, final
+        DB          $6F; 'j' ى alef maqsura: no fwd join; forms: isolated, final
+        DB          $FF; 'k' ال definite article al-: joins fwd; forms: isolated
 
 ; ---- ISOLATED-FORM FONT ($3A6C-$3BC3): glyph = $3864 + 8*code, codes $41-$6B.
 ; ---- (also the fallback glyph when a joined form does not exist)
@@ -736,13 +733,13 @@ ARAB_PO_MSG_HOOK:
         RES     7,B                     ; strip the end-of-message bit
         CALL    L1510                   ; set context bits 7/2 from A and the lookahead B
         CALL    PO_SAVE                 ; print A
-        JP      $0C23                   ; continue the loop
+        JP      L0C23                   ; continue the loop
 ARAB_PO_MSG_LAST:
         RES     7,A          ; last char: clear bit 7
         LD      B,$20                   ; lookahead = space (nothing follows)
         CALL    L1510                   ; context bits
         CALL    PO_SAVE                 ; print
-        JP      $0C2A                   ; leave the loop
+        JP      L0C2A                   ; leave the loop
 ARAB_PR_STRING_HOOK:
         ; $3B57: JP from $203C (PRINT of a string). A=current char, BC=chars remaining AFTER it, HL=current address
         INC     HL                      ; HL -> next character
@@ -758,7 +755,7 @@ ARAB_PR_CTX:
         CALL    L1510             ; context bits
         RST     $10                     ; print A
         POP     BC                      ; restore the count
-        JP      $203D                   ; next iteration of PR-STRING
+        JP      L203D                   ; next iteration of PR-STRING
         DB          $FF, $FF             ; spare. QUIRK FIX (optional, untested, same size): replace the 21 bytes at
                                          ; ARAB_PR_STRING_HOOK with 23 C5 04 05 20 02 0C 0D 46 20 02 06 20 CD 10 15
                                          ; D7 C1 C3 3D 20 (tests BC=0 without touching A; lookahead = $20 at the end)
@@ -1261,1114 +1258,15 @@ ARAB_GLYPH_TABLE_3:
         DB          %00101000
 
 ; ---- Letters in no table (O P Q R W X h, A-F, I, k) always use the isolated font.
+; ---- ARAB_PRINT_EXTRA_MSG ($3CF6): boot-splash helper.  Patched call at $1295 (START-NEW, file 06).
+; ---- Clears the screen, then prints the ARABIC TITLE LOGO: the message that follows the
+; ---- cassette messages in file 04, starting at $09E0 (DE=$09DF is the inverted last byte of the
+; ---- previous message, the step-over byte).  Screen result (row/column of the 8x8 cells):
+; ----       row 12, col 15 : *        row 13, col 15 : |        row 14, cols 11-19 : عرب | رام
+; ----       i.e. "ARAB | RAM"  (key codes "YQH | QGe").
 ARAB_PRINT_EXTRA_MSG:
-        CALL    CLS                   ; $3CF6: relocated helper (patched call at $1292): clear screen,
-        XOR     A                       ; message 0 ...
-        LD      DE,$9DF                 ; ... of the ORIGINAL English table at $09DF
-        JP      PO_MSG                   ; print it
-
-        ORG $3D00
-
-; -------------------------------
-; THE 'ZX SPECTRUM CHARACTER SET'
-; -------------------------------
-
-;; char-set
-
-; $20 - Character: ' '          CHR$(32)
-L3D00:
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-
-; $21 - Character: '!'          CHR$(33)
-
-        DB          %00000000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00000000
-        DB          %00010000
-        DB          %00000000
-
-; $22 - Character: '"'          CHR$(34)
-
-        DB          %00000000
-        DB          %00100100
-        DB          %00100100
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-
-; $23 - Character: '#'          CHR$(35)
-
-        DB          %00000000
-        DB          %00100100
-        DB          %01111110
-        DB          %00100100
-        DB          %00100100
-        DB          %01111110
-        DB          %00100100
-        DB          %00000000
-
-; $24 - Character: '$'          CHR$(36)
-
-        DB          %00000000
-        DB          %00001000
-        DB          %00111110
-        DB          %00101000
-        DB          %00111110
-        DB          %00001010
-        DB          %00111110
-        DB          %00001000
-
-; $25 - Character: '%'          CHR$(37)
-
-        DB          %00000000
-        DB          %01100010
-        DB          %01100100
-        DB          %00001000
-        DB          %00010000
-        DB          %00100110
-        DB          %01000110
-        DB          %00000000
-
-; $26 - Character: '&'          CHR$(38)
-
-        DB          %00000000
-        DB          %00010000
-        DB          %00101000
-        DB          %00010000
-        DB          %00101010
-        DB          %01000100
-        DB          %00111010
-        DB          %00000000
-
-; $27 - Character: '''          CHR$(39)
-
-        DB          %00000000
-        DB          %00001000
-        DB          %00010000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-
-;==========================================================================
-; *** RIGHT-TO-LEFT PUNCTUATION MIRRORING (font table, $3D00-$4000) ***
-;==========================================================================
-;   Starting here, several punctuation glyphs in the STANDARD, STATIC
-;   font table have been edited directly (unlike letters, which are
-;   substituted dynamically -- see $145D). This is a separate, second
-;   mechanism, and a very clean, high-confidence finding:
-;
-;     '(' (code 40) and ')' (code 41)  -- bitmaps SWAPPED with each
-;                                          other (each now draws the
-;                                          other's original shape)
-;     '<' (code 60) and '>' (code 62)  -- bitmaps SWAPPED (mirror pair)
-;     ';' (code 59)                    -- individual rows horizontally
-;                                          mirrored
-;     ',' (44) and '.' (46)            -- minor shape tweaks
-;     '?' (code 63)                    -- horizontally mirrored curve
-;     '[' (91) and ']' (93)            -- replaced with two NEW, custom
-;                                          symbols unrelated to brackets
-;                                          (not identified -- possibly a
-;                                          split ligature or an Arabic-
-;                                          specific punctuation mark)
-;
-;   Digit and A-Z/a-z bitmaps in THIS STATIC TABLE are all UNCHANGED
-;   (confirmed by direct comparison). Letters get their Arabic shapes
-;   from the dynamic substitution at $145D (confirmed on real hardware).
-;   Digits are ALSO confirmed on real hardware to render as Persian/
-;   Arabic-Indic numerals despite this static table being untouched for
-;   codes '0'-'9' -- so digit substitution happens through some other,
-;   not-yet-located mechanism (see the correction note at $145D above).
-;   It is not a simple static font swap, since these bytes are provably
-;   identical to the original ROM.
-;
-;   Swapping the pixel shapes of direction-sensitive punctuation like
-;   parentheses and angle brackets -- while leaving the underlying
-;   character CODE and its meaning in BASIC syntax untouched -- is
-;   exactly what you need to make these symbols look visually correct
-;   when the surrounding text flows right-to-left, and lines up with
-;   the $0DF4 column-formula change documented above. Together, these
-;   two findings make right-to-left rendering a near-certainty rather
-;   than just a hypothesis.
-;==========================================================================
-
-; $28 - Character: '('          CHR$(40)
-
-        DB          %00000000
-        DB          %00100000        ; row 1 of character $28 ('(')  bitmap, mirrored for RTL display
-        DB          %00010000        ; row 2 of character $28 ('(')  bitmap, mirrored for RTL display
-        DB          %00010000        ; row 3 of character $28 ('(')  bitmap, mirrored for RTL display
-        DB          %00010000        ; row 4 of character $28 ('(')  bitmap, mirrored for RTL display
-        DB          %00010000        ; row 5 of character $28 ('(')  bitmap, mirrored for RTL display
-        DB          %00100000        ; row 6 of character $28 ('(')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $29 - Character: ')'          CHR$(41)
-
-        DB          %00000000
-        DB          %00000100        ; row 1 of character $29 (')')  bitmap, mirrored for RTL display
-        DB          %00001000        ; row 2 of character $29 (')')  bitmap, mirrored for RTL display
-        DB          %00001000        ; row 3 of character $29 (')')  bitmap, mirrored for RTL display
-        DB          %00001000        ; row 4 of character $29 (')')  bitmap, mirrored for RTL display
-        DB          %00001000        ; row 5 of character $29 (')')  bitmap, mirrored for RTL display
-        DB          %00000100        ; row 6 of character $29 (')')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $2A - Character: '*'          CHR$(42)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00010100
-        DB          %00001000
-        DB          %00111110
-        DB          %00001000
-        DB          %00010100
-        DB          %00000000
-
-; $2B - Character: '+'          CHR$(43)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00001000
-        DB          %00001000
-        DB          %00111110
-        DB          %00001000
-        DB          %00001000
-        DB          %00000000
-
-; $2C - Character: ','          CHR$(44)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00001000
-        DB          %00001000
-        DB          %00000100        ; row 7 of character $2C (',')  bitmap, mirrored for RTL display
-
-; $2D - Character: '-'          CHR$(45)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00111110
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-
-; $2E - Character: '.'          CHR$(46)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000100        ; row 2 of character $2E ('.')  bitmap, mirrored for RTL display
-        DB          %00001000        ; row 3 of character $2E ('.')  bitmap, mirrored for RTL display
-        DB          %00001100        ; row 4 of character $2E ('.')  bitmap, mirrored for RTL display
-        DB          %00001100        ; row 5 of character $2E ('.')  bitmap, mirrored for RTL display
-        DB          %00000000        ; row 6 of character $2E ('.')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $2F - Character: '/'          CHR$(47)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000010
-        DB          %00000100
-        DB          %00001000
-        DB          %00010000
-        DB          %00100000
-        DB          %00000000
-
-; $30 - Character: '0'          CHR$(48)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000110
-        DB          %01001010
-        DB          %01010010
-        DB          %01100010
-        DB          %00111100
-        DB          %00000000
-
-; $31 - Character: '1'          CHR$(49)
-
-        DB          %00000000
-        DB          %00011000
-        DB          %00101000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00111110
-        DB          %00000000
-
-; $32 - Character: '2'          CHR$(50)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %00000010
-        DB          %00111100
-        DB          %01000000
-        DB          %01111110
-        DB          %00000000
-
-; $33 - Character: '3'          CHR$(51)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %00001100
-        DB          %00000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $34 - Character: '4'          CHR$(52)
-
-        DB          %00000000
-        DB          %00001000
-        DB          %00011000
-        DB          %00101000
-        DB          %01001000
-        DB          %01111110
-        DB          %00001000
-        DB          %00000000
-
-; $35 - Character: '5'          CHR$(53)
-
-        DB          %00000000
-        DB          %01111110
-        DB          %01000000
-        DB          %01111100
-        DB          %00000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $36 - Character: '6'          CHR$(54)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000000
-        DB          %01111100
-        DB          %01000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $37 - Character: '7'          CHR$(55)
-
-        DB          %00000000
-        DB          %01111110
-        DB          %00000010
-        DB          %00000100
-        DB          %00001000
-        DB          %00010000
-        DB          %00010000
-        DB          %00000000
-
-; $38 - Character: '8'          CHR$(56)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %00111100
-        DB          %01000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $39 - Character: '9'          CHR$(57)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %01000010
-        DB          %00111110
-        DB          %00000010
-        DB          %00111100
-        DB          %00000000
-
-; $3A - Character: ':'          CHR$(58)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00010000
-        DB          %00000000
-        DB          %00000000
-        DB          %00010000
-        DB          %00000000
-
-; $3B - Character: ';'          CHR$(59)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00001000        ; row 2 of character $3B (';')  bitmap, mirrored for RTL display
-        DB          %00000000
-        DB          %00000000
-        DB          %00001000        ; row 5 of character $3B (';')  bitmap, mirrored for RTL display
-        DB          %00001000        ; row 6 of character $3B (';')  bitmap, mirrored for RTL display
-        DB          %00000100        ; row 7 of character $3B (';')  bitmap, mirrored for RTL display
-
-; $3C - Character: '<'          CHR$(60)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00010000        ; row 2 of character $3C ('<')  bitmap, mirrored for RTL display
-        DB          %00001000
-        DB          %00000100        ; row 4 of character $3C ('<')  bitmap, mirrored for RTL display
-        DB          %00001000
-        DB          %00010000        ; row 6 of character $3C ('<')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $3D - Character: '='          CHR$(61)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00111110
-        DB          %00000000
-        DB          %00111110
-        DB          %00000000
-        DB          %00000000
-
-; $3E - Character: '>'          CHR$(62)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000100        ; row 2 of character $3E ('>')  bitmap, mirrored for RTL display
-        DB          %00001000
-        DB          %00010000        ; row 4 of character $3E ('>')  bitmap, mirrored for RTL display
-        DB          %00001000
-        DB          %00000100        ; row 6 of character $3E ('>')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $3F - Character: '?'          CHR$(63)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %00100000        ; row 3 of character $3F ('?')  bitmap, mirrored for RTL display
-        DB          %00010000        ; row 4 of character $3F ('?')  bitmap, mirrored for RTL display
-        DB          %00000000
-        DB          %00010000        ; row 6 of character $3F ('?')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $40 - Character: '@'          CHR$(64)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01001010
-        DB          %01010110
-        DB          %01011110
-        DB          %01000000
-        DB          %00111100
-        DB          %00000000
-
-; $41 - Character: 'A'          CHR$(65)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %01000010
-        DB          %01111110
-        DB          %01000010
-        DB          %01000010
-        DB          %00000000
-
-; $42 - Character: 'B'          CHR$(66)
-
-        DB          %00000000
-        DB          %01111100
-        DB          %01000010
-        DB          %01111100
-        DB          %01000010
-        DB          %01000010
-        DB          %01111100
-        DB          %00000000
-
-; $43 - Character: 'C'          CHR$(67)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %01000000
-        DB          %01000000
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $44 - Character: 'D'          CHR$(68)
-
-        DB          %00000000
-        DB          %01111000
-        DB          %01000100
-        DB          %01000010
-        DB          %01000010
-        DB          %01000100
-        DB          %01111000
-        DB          %00000000
-
-; $45 - Character: 'E'          CHR$(69)
-
-        DB          %00000000
-        DB          %01111110
-        DB          %01000000
-        DB          %01111100
-        DB          %01000000
-        DB          %01000000
-        DB          %01111110
-        DB          %00000000
-
-; $46 - Character: 'F'          CHR$(70)
-
-        DB          %00000000
-        DB          %01111110
-        DB          %01000000
-        DB          %01111100
-        DB          %01000000
-        DB          %01000000
-        DB          %01000000
-        DB          %00000000
-
-; $47 - Character: 'G'          CHR$(71)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %01000000
-        DB          %01001110
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $48 - Character: 'H'          CHR$(72)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %01000010
-        DB          %01111110
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %00000000
-
-; $49 - Character: 'I'          CHR$(73)
-
-        DB          %00000000
-        DB          %00111110
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00111110
-        DB          %00000000
-
-; $4A - Character: 'J'          CHR$(74)
-
-        DB          %00000000
-        DB          %00000010
-        DB          %00000010
-        DB          %00000010
-        DB          %01000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $4B - Character: 'K'          CHR$(75)
-
-        DB          %00000000
-        DB          %01000100
-        DB          %01001000
-        DB          %01110000
-        DB          %01001000
-        DB          %01000100
-        DB          %01000010
-        DB          %00000000
-
-; $4C - Character: 'L'          CHR$(76)
-
-        DB          %00000000
-        DB          %01000000
-        DB          %01000000
-        DB          %01000000
-        DB          %01000000
-        DB          %01000000
-        DB          %01111110
-        DB          %00000000
-
-; $4D - Character: 'M'          CHR$(77)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %01100110
-        DB          %01011010
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %00000000
-
-; $4E - Character: 'N'          CHR$(78)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %01100010
-        DB          %01010010
-        DB          %01001010
-        DB          %01000110
-        DB          %01000010
-        DB          %00000000
-
-; $4F - Character: 'O'          CHR$(79)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $50 - Character: 'P'          CHR$(80)
-
-        DB          %00000000
-        DB          %01111100
-        DB          %01000010
-        DB          %01000010
-        DB          %01111100
-        DB          %01000000
-        DB          %01000000
-        DB          %00000000
-
-; $51 - Character: 'Q'          CHR$(81)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000010
-        DB          %01000010
-        DB          %01010010
-        DB          %01001010
-        DB          %00111100
-        DB          %00000000
-
-; $52 - Character: 'R'          CHR$(82)
-
-        DB          %00000000
-        DB          %01111100
-        DB          %01000010
-        DB          %01000010
-        DB          %01111100
-        DB          %01000100
-        DB          %01000010
-        DB          %00000000
-
-; $53 - Character: 'S'          CHR$(83)
-
-        DB          %00000000
-        DB          %00111100
-        DB          %01000000
-        DB          %00111100
-        DB          %00000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $54 - Character: 'T'          CHR$(84)
-
-        DB          %00000000
-        DB          %11111110
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00000000
-
-; $55 - Character: 'U'          CHR$(85)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %00111100
-        DB          %00000000
-
-; $56 - Character: 'V'          CHR$(86)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %00100100
-        DB          %00011000
-        DB          %00000000
-
-; $57 - Character: 'W'          CHR$(87)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %01000010
-        DB          %01011010
-        DB          %00100100
-        DB          %00000000
-
-; $58 - Character: 'X'          CHR$(88)
-
-        DB          %00000000
-        DB          %01000010
-        DB          %00100100
-        DB          %00011000
-        DB          %00011000
-        DB          %00100100
-        DB          %01000010
-        DB          %00000000
-
-; $59 - Character: 'Y'          CHR$(89)
-
-        DB          %00000000
-        DB          %10000010
-        DB          %01000100
-        DB          %00101000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00000000
-
-; $5A - Character: 'Z'          CHR$(90)
-
-        DB          %00000000
-        DB          %01111110
-        DB          %00000100
-        DB          %00001000
-        DB          %00010000
-        DB          %00100000
-        DB          %01111110
-        DB          %00000000
-
-; $5B - Character: '['          CHR$(91)
-
-        DB          %00000000
-        DB          %00000000        ; row 1 of character $5B ('[')  bitmap, mirrored for RTL display
-        DB          %00000010        ; row 2 of character $5B ('[')  bitmap, mirrored for RTL display
-        DB          %00111100        ; row 3 of character $5B ('[')  bitmap, mirrored for RTL display
-        DB          %01010100        ; row 4 of character $5B ('[')  bitmap, mirrored for RTL display
-        DB          %00010100        ; row 5 of character $5B ('[')  bitmap, mirrored for RTL display
-        DB          %00010100        ; row 6 of character $5B ('[')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $5C - Character: '\'          CHR$(92)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01000000
-        DB          %00100000
-        DB          %00010000
-        DB          %00001000
-        DB          %00000100
-        DB          %00000000
-
-; $5D - Character: ']'          CHR$(93)
-
-        DB          %00000000
-        DB          %00111100        ; row 1 of character $5D (']')  bitmap, mirrored for RTL display
-        DB          %01000000        ; row 2 of character $5D (']')  bitmap, mirrored for RTL display
-        DB          %01111000        ; row 3 of character $5D (']')  bitmap, mirrored for RTL display
-        DB          %01000000        ; row 4 of character $5D (']')  bitmap, mirrored for RTL display
-        DB          %01000000        ; row 5 of character $5D (']')  bitmap, mirrored for RTL display
-        DB          %00111100        ; row 6 of character $5D (']')  bitmap, mirrored for RTL display
-        DB          %00000000
-
-; $5E - Character: '^'          CHR$(94)
-
-        DB          %00000000
-        DB          %00010000
-        DB          %00111000
-        DB          %01010100
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00000000
-
-; $5F - Character: '_'          CHR$(95)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %11111111
-
-; $60 - Character: 'ukp'        CHR$(96)
-
-        DB          %00000000
-        DB          %00011100
-        DB          %00100010
-        DB          %01111000
-        DB          %00100000
-        DB          %00100000
-        DB          %01111110
-        DB          %00000000
-
-; $61 - Character: 'a'          CHR$(97)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00111000
-        DB          %00000100
-        DB          %00111100
-        DB          %01000100
-        DB          %00111100
-        DB          %00000000
-
-; $62 - Character: 'b'          CHR$(98)
-
-        DB          %00000000
-        DB          %00100000
-        DB          %00100000
-        DB          %00111100
-        DB          %00100010
-        DB          %00100010
-        DB          %00111100
-        DB          %00000000
-
-; $63 - Character: 'c'          CHR$(99)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00011100
-        DB          %00100000
-        DB          %00100000
-        DB          %00100000
-        DB          %00011100
-        DB          %00000000
-
-; $64 - Character: 'd'          CHR$(100)
-
-        DB          %00000000
-        DB          %00000100
-        DB          %00000100
-        DB          %00111100
-        DB          %01000100
-        DB          %01000100
-        DB          %00111100
-        DB          %00000000
-
-; $65 - Character: 'e'          CHR$(101)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00111000
-        DB          %01000100
-        DB          %01111000
-        DB          %01000000
-        DB          %00111100
-        DB          %00000000
-
-; $66 - Character: 'f'          CHR$(102)
-
-        DB          %00000000
-        DB          %00001100
-        DB          %00010000
-        DB          %00011000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00000000
-
-; $67 - Character: 'g'          CHR$(103)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00111100
-        DB          %01000100
-        DB          %01000100
-        DB          %00111100
-        DB          %00000100
-        DB          %00111000
-
-; $68 - Character: 'h'          CHR$(104)
-
-        DB          %00000000
-        DB          %01000000
-        DB          %01000000
-        DB          %01111000
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %00000000
-
-; $69 - Character: 'i'          CHR$(105)
-
-        DB          %00000000
-        DB          %00010000
-        DB          %00000000
-        DB          %00110000
-        DB          %00010000
-        DB          %00010000
-        DB          %00111000
-        DB          %00000000
-
-; $6A - Character: 'j'          CHR$(106)
-
-        DB          %00000000
-        DB          %00000100
-        DB          %00000000
-        DB          %00000100
-        DB          %00000100
-        DB          %00000100
-        DB          %00100100
-        DB          %00011000
-
-; $6B - Character: 'k'          CHR$(107)
-
-        DB          %00000000
-        DB          %00100000
-        DB          %00101000
-        DB          %00110000
-        DB          %00110000
-        DB          %00101000
-        DB          %00100100
-        DB          %00000000
-
-; $6C - Character: 'l'          CHR$(108)
-
-        DB          %00000000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00001100
-        DB          %00000000
-
-; $6D - Character: 'm'          CHR$(109)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01101000
-        DB          %01010100
-        DB          %01010100
-        DB          %01010100
-        DB          %01010100
-        DB          %00000000
-
-; $6E - Character: 'n'          CHR$(110)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01111000
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %00000000
-
-; $6F - Character: 'o'          CHR$(111)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00111000
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %00111000
-        DB          %00000000
-
-; $70 - Character: 'p'          CHR$(112)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01111000
-        DB          %01000100
-        DB          %01000100
-        DB          %01111000
-        DB          %01000000
-        DB          %01000000
-
-; $71 - Character: 'q'          CHR$(113)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00111100
-        DB          %01000100
-        DB          %01000100
-        DB          %00111100
-        DB          %00000100
-        DB          %00000110
-
-; $72 - Character: 'r'          CHR$(114)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00011100
-        DB          %00100000
-        DB          %00100000
-        DB          %00100000
-        DB          %00100000
-        DB          %00000000
-
-; $73 - Character: 's'          CHR$(115)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %00111000
-        DB          %01000000
-        DB          %00111000
-        DB          %00000100
-        DB          %01111000
-        DB          %00000000
-
-; $74 - Character: 't'          CHR$(116)
-
-        DB          %00000000
-        DB          %00010000
-        DB          %00111000
-        DB          %00010000
-        DB          %00010000
-        DB          %00010000
-        DB          %00001100
-        DB          %00000000
-
-; $75 - Character: 'u'          CHR$(117)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %00111000
-        DB          %00000000
-
-; $76 - Character: 'v'          CHR$(118)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01000100
-        DB          %01000100
-        DB          %00101000
-        DB          %00101000
-        DB          %00010000
-        DB          %00000000
-
-; $77 - Character: 'w'          CHR$(119)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01000100
-        DB          %01010100
-        DB          %01010100
-        DB          %01010100
-        DB          %00101000
-        DB          %00000000
-
-; $78 - Character: 'x'          CHR$(120)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01000100
-        DB          %00101000
-        DB          %00010000
-        DB          %00101000
-        DB          %01000100
-        DB          %00000000
-
-; $79 - Character: 'y'          CHR$(121)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01000100
-        DB          %01000100
-        DB          %01000100
-        DB          %00111100
-        DB          %00000100
-        DB          %00111000
-
-; $7A - Character: 'z'          CHR$(122)
-
-        DB          %00000000
-        DB          %00000000
-        DB          %01111100
-        DB          %00001000
-        DB          %00010000
-        DB          %00100000
-        DB          %01111100
-        DB          %00000000
-
-; $7B - Character: '{'          CHR$(123)
-
-        DB          %00000000
-        DB          %00001110
-        DB          %00001000
-        DB          %00110000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001110
-        DB          %00000000
-
-; $7C - Character: '|'          CHR$(124)
-
-        DB          %00000000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00001000
-        DB          %00000000
-
-; $7D - Character: '}'          CHR$(125)
-
-        DB          %00000000
-        DB          %01110000
-        DB          %00010000
-        DB          %00001100
-        DB          %00010000
-        DB          %00010000
-        DB          %01110000
-        DB          %00000000
-
-; $7E - Character: '~'          CHR$(126)
-
-        DB          %00000000
-        DB          %00010100
-        DB          %00101000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-        DB          %00000000
-
-; $7F - Character: '(c)'        CHR$(127)
-
-        DB          %00111100
-        DB          %01000010
-        DB          %10011001
-        DB          %10100001
-        DB          %10100001
-        DB          %10011001
-        DB          %01000010
-        DB          %00111100
+        CALL    CLS                   ; clear the screen (leaves the lower-screen channel open)
+        XOR     A                       ; message number 0 ...
+        LD      DE,TAPE_MSG_4_END       ; ... after the step-over byte (end of tape message 4, file 04; boot title follows)
+        JP      PO_MSG                   ; print it (PO-MSG returns to START-NEW)
+        

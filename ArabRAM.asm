@@ -3,7 +3,7 @@
 ; data), DM (text strings), ORG (set address), EQU (constant).
 
 
-
+        INCLUDE "src/00_system_variables.asm"
         INCLUDE "src/01_restarts_and_tables.asm"
         INCLUDE "src/02_keyboard_routines.asm"
         INCLUDE "src/03_loudspeaker_routines.asm"
@@ -15,7 +15,7 @@
         INCLUDE "src/09_arithmetic_routines.asm"
         INCLUDE "src/10_floating_point_calculator.asm"
         INCLUDE "src/11_arabic_glyph_font.asm"
-
+        INCLUDE "src/12_zx_spectrum_char_set.asm"
 ; #end                            ; generic cross-assembler directive   ; (sjasmplus: END not required)
 
 ; Acknowledgements
@@ -68,6 +68,9 @@
 ;** patch for the 48K ZX Spectrum, regenerated from a 16384-byte binary  **
 ;** diff against the standard Sinclair 48K ROM disassembly.              **
 ;**                                                                       **
+;** This file reassembles byte-for-byte identical to the patched ROM     **
+;** (verified with sjasmplus v1.24.0, github.com/z00m128/sjasmplus).      **
+;**                                                                      **
 ;** SUMMARY OF WHAT CHANGED (see the boxed comments at each address for  **
 ;** full detail):                                                        **
 ;**   $0013/$0025/$002B/$005F  Small stub routines squeezed into unused  **

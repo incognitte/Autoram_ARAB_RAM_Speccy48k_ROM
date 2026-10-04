@@ -48,7 +48,7 @@ BEEPER:
         ADD     IX,BC           ;   IX holds address of entry into the loop
                                 ;   the loop will contain 0-3 NOPs, implementing
                                 ;   the fine part of the tone period.
-        LD      A,($5C48)       ; BORDCR
+        LD      A,(BORDCR)       ; BORDCR
         AND     $38             ; bits 5..3 contain border colour
         RRCA                    ; border colour bits moved to 2..0
         RRCA                    ;   to match border bits on port #FE
@@ -128,7 +128,7 @@ BEEP:
         DB          $0F             ;;addition
         DB          $38             ;;end-calc                   ; leave on calc stack
 
-        LD      HL,$5C92        ; MEM-0: number stored here is in 16 bit integer format (pitch)
+        LD      HL,MEM_0        ; MEM-0: number stored here is in 16 bit integer format (pitch)
                                 ;   0, 0/FF (pos/neg), LSB, MSB, 0
                                 ;   LSB/MSB is stored in two's complement
                                 ; In the following, the pitch is checked if it is in the range -128<=p<=127

@@ -144,7 +144,7 @@ CALCULATE:
 
 GEN_ENT_1:
         LD      A,B             ; fetch the Z80 B register to A
-        LD      ($5C67),A       ; and store value in system variable BREG.
+        LD      (BREG),A       ; and store value in system variable BREG.
                                 ; this will be the counter for dec-jr-nz
                                 ; or if used from fp-calc2 the calculator
                                 ; instruction.
@@ -163,7 +163,7 @@ GEN_ENT_2:
 ; this is the re-entry looping point when handling a string of literals.
 
 RE_ENTRY:
-        LD      ($5C65),DE      ; save end of stack in system variable STKEND
+        LD      (STKEND),DE      ; save end of stack in system variable STKEND
         EXX                     ; switch to alt
         LD      A,(HL)          ; get next literal
         INC     HL              ; increase pointer'
@@ -256,7 +256,7 @@ DELETE:
 ;   of the mathematical and string functions found in BASIC expressions.
 FP_CALC_2:
         POP     AF              ; drop return address.
-        LD      A,($5C67)       ; load accumulator from system variable BREG
+        LD      A,(BREG)       ; load accumulator from system variable BREG
                                 ; value will be literal e.g. 'tan'
         EXX                     ; switch to alt
         JR      SCAN_ENT        ; back to SCAN-ENT
@@ -288,11 +288,11 @@ TEST_5_SP:
 ;   calculator suite of routines.  On entry, HL points to the number to be
 ;   stacked.
 STACK_NUM:
-        LD      DE,($5C65)      ; Load destination from STKEND system variable.
+        LD      DE,(STKEND)      ; Load destination from STKEND system variable.
 
         CALL    MOVE_FP           ; Routine MOVE-FP puts on calculator stack
                                 ; with a memory check.
-        LD      ($5C65),DE      ; Set STKEND to next free location.
+        LD      (STKEND),DE      ; Set STKEND to next free location.
 
         RET                     ; Return.
 
@@ -452,7 +452,7 @@ LOC_MEM:
 ; The calculator stack increases by 5 bytes.
 GET_MEM_XX:
         PUSH    DE              ; save STKEND
-        LD      HL,($5C68)      ; MEM is base address of the memory cells.
+        LD      HL,(MEM)      ; MEM is base address of the memory cells.
         CALL    LOC_MEM         ; routine LOC-MEM so that HL = first byte
         CALL    MOVE_FP         ; routine MOVE-FP moves 5 bytes with memory
                                 ; check.
@@ -500,7 +500,7 @@ STK_CONST_XX:
 ST_MEM_XX:
         PUSH    HL              ; save the result pointer.
         EX      DE,HL           ; transfer to DE.
-        LD      HL,($5C68)      ; fetch MEM the base of memory area.
+        LD      HL,(MEM)      ; fetch MEM the base of memory area.
         CALL    LOC_MEM         ; routine LOC-MEM sets HL to the destination.
         EX      DE,HL           ; swap - HL is start, DE is destination.
         CALL    MOVE_FP         ; routine MOVE-FP.
@@ -795,7 +795,7 @@ USR_RANGE:
         JR      NC,REPORT_A     ; to REPORT-A if originally higher
                                 ; than 'U','u' or graphics U.
 
-        LD      BC,($5C7B)      ; fetch the UDG system variable value.
+        LD      BC,(UDG)      ; fetch the UDG system variable value.
         ADD     A,C             ; add the offset to character
         LD      C,A             ; and store back in register C.
         JR      NC,USR_STACK    ; forward to USR-STACK if no overflow.
@@ -1284,7 +1284,7 @@ OTHER_STR:
 ;   the same reason and to initialize the calculator stack at the start of
 ;   the CALCULATE routine.
 STK_PNTRS:
-        LD      HL,($5C65)      ; fetch STKEND value from system variable.
+        LD      HL,(STKEND)      ; fetch STKEND value from system variable.
         LD      DE,$FFFB        ; the value -5
         PUSH    HL              ; push STKEND value.
 
@@ -1335,7 +1335,7 @@ REPORT_BD:
 ;   VAL$ treats the characters in a string as a string expression.
 ;   e.g. VAL$ (z$+"(2)") = a$(2) if z$ happens to be "a$".
 VAL:
-        LD      HL,($5C5D)      ; fetch value of system variable CH_ADD
+        LD      HL,(CH_ADD)      ; fetch value of system variable CH_ADD
         PUSH    HL              ; and save on the machine stack.
         LD      A,B             ; fetch the literal (either $1D or $18).
         ADD     A,$E3           ; add $E3 to form $00 (setting carry) or $FB.
@@ -1351,7 +1351,7 @@ VAL:
 
         RST     30H             ; BC-SPACES creates the space in workspace.
         POP     HL              ; restore start of string to HL.
-        LD      ($5C5D),DE      ; load CH_ADD with start DE in workspace.
+        LD      (CH_ADD),DE      ; load CH_ADD with start DE in workspace.
 
         PUSH    DE              ; save the start in workspace
         LDIR                    ; copy string from program or variables or
@@ -1377,13 +1377,13 @@ VAL:
 V_RPORT_C:
         JP      NZ,REPORT_C        ; jump back to REPORT-C with a result mismatch.
 
-        LD      ($5C5D),HL      ; set CH_ADD to the start of the string again.
+        LD      (CH_ADD),HL      ; set CH_ADD to the start of the string again.
         SET     7,(IY+$01)      ; update FLAGS  - signal running program.
         CALL    SCANNING        ; routine SCANNING evaluates the string
                                 ; in full leaving result on calculator stack.
 
         POP     HL              ; restore saved character address in program.
-        LD      ($5C5D),HL      ; and reset the system variable CH_ADD.
+        LD      (CH_ADD),HL      ; and reset the system variable CH_ADD.
 
         JR      STK_PNTRS           ; back to exit via STK-PNTRS.
                                 ; resetting the calculator stack pointers
@@ -1401,10 +1401,10 @@ STR:
         LD      BC,$0001        ; create an initial byte in workspace
         RST     30H             ; using BC-SPACES restart.
 
-        LD      ($5C5B),HL      ; set system variable K_CUR to new location.
+        LD      (K_CUR),HL      ; set system variable K_CUR to new location.
         PUSH    HL              ; and save start on machine stack also.
 
-        LD      HL,($5C51)      ; fetch value of system variable CURCHL
+        LD      HL,(CURCHL)      ; fetch value of system variable CURCHL
         PUSH    HL              ; and save that too.
 
         LD      A,$FF           ; select system channel 'R'.
@@ -1416,7 +1416,7 @@ STR:
         CALL    CHAN_FLAG       ; routine CHAN-FLAG resets flags.
 
         POP     DE              ; fetch saved start of string to DE.
-        LD      HL,($5C5B)      ; load HL with end of string from K_CUR.
+        LD      HL,(K_CUR)      ; load HL with end of string from K_CUR.
 
         AND     A               ; prepare for true subtraction.
         SBC     HL,DE           ; subtract start from end to give length.
@@ -1444,7 +1444,7 @@ READ_IN:
                                 ; 'Integer out of range'
                                 ; (REPORT-Bd is within range)
 
-        LD      HL,($5C51)      ; fetch current channel CURCHL
+        LD      HL,(CURCHL)      ; fetch current channel CURCHL
         PUSH    HL              ; save it
 
         CALL    CHAN_OPEN           ; routine CHAN-OPEN opens channel
@@ -1517,7 +1517,7 @@ DEC_JR_NZ:
         EXX                     ; switch in set that addresses code
 
         PUSH    HL              ; save pointer to offset byte
-        LD      HL,$5C67        ; address BREG in system variables
+        LD      HL,BREG        ; address BREG in system variables
         DEC     (HL)            ; decrement it
         POP     HL              ; restore pointer
 
